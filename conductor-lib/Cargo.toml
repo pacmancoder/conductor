@@ -1,0 +1,7 @@
+[package]
+name = "conductor-lib"
+version = "0.1.0"
+authors = ["Vladyslav Nikonov <mail@pacmancoder.xyz>"]
+edition = "2018"
+
+[dependencies]
