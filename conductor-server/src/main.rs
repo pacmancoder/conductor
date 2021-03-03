@@ -1,7 +1,7 @@
-use clap::Clap;
 use anyhow::Context;
-use tokio::sync::Notify;
+use clap::Clap;
 use std::sync::Arc;
+use tokio::sync::Notify;
 
 use conductor_server::rest::server::RestServer;
 
@@ -17,7 +17,8 @@ fn register_ctrlc_handler() -> Arc<Notify> {
         ctrlc::set_handler(move || {
             event.notify_waiters();
             log::warn!("Detected stop server request (Ctrl+C)");
-        }).expect("Failed to set ctrl-c handler");
+        })
+        .expect("Failed to set ctrl-c handler");
     }
 
     shutdown_event
@@ -25,8 +26,6 @@ fn register_ctrlc_handler() -> Arc<Notify> {
 
 fn spawn_server_tasks(runtime: &tokio::runtime::Runtime) {
     runtime.spawn(RestServer::new().run());
-
-    // TODO: Return gracefull shutdown handles Vec
 }
 
 fn main() -> Result<(), anyhow::Error> {

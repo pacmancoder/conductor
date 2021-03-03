@@ -5,3 +5,8 @@ authors = ["Vladyslav Nikonov <mail@pacmancoder.xyz>"]
 edition = "2018"
 
 [dependencies]
+tokio-util = { version = "0.6.3", features = ["codec"] }
+bitflags = "1.2.1"
+uuid = { version = "0.8.2", features = ["serde"] }
+picky = { version = "6.1.2", features = ["x509", "jose"] }
+serde = "1.0.123"
