@@ -256,11 +256,13 @@ dependencies = [
  "bitflags",
  "byteorder",
  "bytes",
+ "futures",
  "log",
  "picky",
  "serde",
  "serde_cbor",
  "thiserror",
+ "tokio",
  "tokio-util",
  "uuid",
 ]
