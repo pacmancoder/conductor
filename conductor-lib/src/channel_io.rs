@@ -18,7 +18,7 @@ enum ChannelTxState {
     WritingMessage(ConductorMessage),
 }
 
-struct ChannelIO {
+pub struct ChannelIO {
     channel_num: DataChannelId,
 
     tx: mpsc::Sender<ConductorMessage>,
@@ -29,7 +29,7 @@ struct ChannelIO {
 }
 
 impl ChannelIO {
-    fn new(
+    pub fn new(
         channel_num: DataChannelId,
         tx: mpsc::Sender<ConductorMessage>,
         rx: mpsc::Receiver<ConductorMessage>,

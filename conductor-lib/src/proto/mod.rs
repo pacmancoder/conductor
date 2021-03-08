@@ -15,10 +15,10 @@
 
 mod control;
 
-use bitflags::bitflags;
+
 use byteorder::ReadBytesExt;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use serde::{Deserialize, Serialize};
+
 use thiserror::Error;
 use tokio_util::codec::{Decoder, Encoder};
 use uuid::Uuid;
