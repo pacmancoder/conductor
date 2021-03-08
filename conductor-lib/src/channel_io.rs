@@ -1,6 +1,6 @@
 use crate::proto::{ConductorMessage, DataChannelId};
 use bytes::{Bytes, BytesMut};
-use futures::{channel::mpsc, ready, Sink, Stream};
+use futures::{channel::mpsc, ready, Stream};
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -65,6 +65,7 @@ impl AsyncRead for ChannelIO {
                 }
                 ChannelRxState::ReadingMessage(message) => {
                     let bytes_to_read = message.data.len().min(buf.remaining());
+
                     let slice_to_read = message.data.split_to(bytes_to_read);
                     buf.put_slice(&slice_to_read);
 
@@ -72,12 +73,10 @@ impl AsyncRead for ChannelIO {
                         self.rx_state = ChannelRxState::WaitingForMessage;
                     }
 
-                    break;
+                    return Poll::Ready(Ok(()));
                 }
             }
         }
-
-        Poll::Pending
     }
 }
 

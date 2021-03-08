@@ -2,28 +2,19 @@ use crate::{
     channel_io::ChannelIO,
     proto::{ConductorCodec, ConductorMessage, ConductorProtoError, DataChannelId},
 };
-
-use futures::{channel::mpsc, ready, FutureExt, Sink, SinkExt, Stream, StreamExt};
-use std::{
-    collections::HashMap,
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    u16,
-};
+use futures::{channel::mpsc, SinkExt, StreamExt};
+use std::{sync::Arc, u16};
 use thiserror::Error;
 use tokio::net::TcpSocket;
 use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream, ToSocketAddrs},
     select,
-    sync::{mpsc::error::TrySendError, Mutex},
+    sync::Mutex,
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
 
 #[derive(Debug, Error)]
-enum SwitchError {
+pub enum SwitchError {
     #[error("Channel already exist")]
     ChannelAlreadyExist,
     #[error("Channel is unregistered")]
@@ -42,9 +33,13 @@ enum SwitchError {
     AcceptFailed,
     #[error(transparent)]
     ProtoError(#[from] ConductorProtoError),
+    #[error("Tx transport failure")]
+    TxTransportFailure,
+    #[error("Rx transport failure")]
+    RxTransportFailure,
 }
 
-type SwitchResult<T> = Result<T, SwitchError>;
+pub type SwitchResult<T> = Result<T, SwitchError>;
 type SwitchSender = mpsc::Sender<ConductorMessage>;
 type SwitchReceiver = mpsc::Receiver<ConductorMessage>;
 
@@ -142,7 +137,7 @@ struct ChannelSwitchContext {
     tx_channel: (SwitchSender, Option<SwitchReceiver>),
 }
 
-struct ChannelSwitch {
+pub struct ChannelSwitch {
     ctx: Arc<Mutex<ChannelSwitchContext>>,
 }
 
@@ -153,7 +148,9 @@ impl ChannelSwitch {
         let tx = FramedWrite::new(tx_tcp, ConductorCodec::encoder());
         let rx = FramedRead::new(rx_tcp, ConductorCodec::decoder());
 
-        let receive_task = async {
+        let ctx_clone = ctx.clone();
+
+        let receive_task = tokio::spawn(async move {
             let mut rx = rx;
 
             loop {
@@ -161,47 +158,54 @@ impl ChannelSwitch {
                     let channel = message.channel;
                     let mut rx_sender = {
                         // TODO: should not acquire mutex on each packet!
-                        let mut locked = ctx.lock().await;
+                        let mut locked = ctx_clone.lock().await;
                         locked
                             .channels
                             .get_channel(channel)
                             .as_ref()
-                            .expect("no channel created")
+                            .expect("Channel is missing")
                             .rx_channel
                             .0
                             .clone()
                     };
-                    rx_sender.send(message).await.expect("rx failed");
+                    rx_sender
+                        .send(message)
+                        .await
+                        .map_err(|_| SwitchError::RxTransportFailure)?;
                 } else {
                     break;
                 }
             }
 
             SwitchResult::Ok(())
-        };
+        });
 
-        let send_task = async {
+        let send_task = tokio::spawn(async move {
             let mut tx = tx;
 
             let mut tx_receiver = {
                 let mut locked = ctx.lock().await;
+
                 locked
                     .tx_channel
                     .1
                     .take()
-                    .expect("tx_channel already captured")
+                    .expect("Can't run channel processing twice")
             };
 
             loop {
                 if let Some(message) = tx_receiver.next().await {
-                    tx.send(message).await.expect("tx failed");
+                    tx.send(message)
+                        .await
+                        .map_err(|_| SwitchError::TxTransportFailure)?;
                 } else {
                     break;
                 }
             }
 
             SwitchResult::Ok(())
-        };
+        });
+
         let result = select!(
             send_result = send_task => send_result,
             receive_result = receive_task => receive_result,
@@ -225,7 +229,7 @@ impl ChannelSwitch {
             .await
             .map_err(|_| SwitchError::ConnectFailed)?;
 
-        Self::process_socket(self.ctx.clone(), stream);
+        Self::process_socket(self.ctx.clone(), stream).await;
 
         Ok(())
     }
@@ -248,8 +252,6 @@ impl ChannelSwitch {
                 .map_err(|_| SwitchError::AcceptFailed)?;
             tokio::spawn(Self::process_socket(self.ctx.clone(), stream));
         }
-
-        Ok(())
     }
 
     pub async fn create_channel(&mut self, num: DataChannelId) -> SwitchResult<ChannelIO> {
