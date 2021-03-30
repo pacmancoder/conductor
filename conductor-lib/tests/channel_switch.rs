@@ -1,5 +1,12 @@
 use conductor_lib::{channel_switch::ChannelSwitch, proto::DataChannelId};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_rustls::{
+    rustls::{
+        self, internal::pemfile, ClientConfig, DangerousClientConfig, NoClientAuth, ServerConfig,
+    },
+    TlsAcceptor, TlsConnector, TlsStream,
+};
 
 #[tokio::test]
 async fn channel_switch_handles_one_channel() {
@@ -173,6 +180,101 @@ async fn channel_switch_handles_two_channels() {
 
     match (write_result, read_ch1_result, read_ch2_result) {
         (Ok(Ok(_)), Ok(Ok(_)), Ok(Ok(_))) => {}
+        _ => {
+            panic!("transfer failed!")
+        }
+    }
+}
+
+pub struct IngoreCertVerifier;
+
+impl rustls::ServerCertVerifier for IngoreCertVerifier {
+    fn verify_server_cert(
+        &self,
+        _roots: &rustls::RootCertStore,
+        _presented_certs: &[rustls::Certificate],
+        _dns_name: webpki::DNSNameRef<'_>,
+        _ocsp: &[u8],
+    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+        Ok(rustls::ServerCertVerified::assertion())
+    }
+}
+
+#[tokio::test]
+async fn channel_switch_can_handle_rustls() {
+    let cert = include_bytes!("cert/default.crt");
+    let mut cert_slice = &cert[..];
+    let key = include_bytes!("cert/default.key");
+    let mut key_slice = &key[..];
+
+    let cert = pemfile::certs(&mut cert_slice)
+        .unwrap()
+        .iter()
+        .cloned()
+        .next()
+        .unwrap();
+
+    let private_key = pemfile::rsa_private_keys(&mut key_slice)
+        .unwrap()
+        .iter()
+        .cloned()
+        .next()
+        .unwrap();
+
+    let mut config = ServerConfig::new(NoClientAuth::new());
+    config.set_single_cert(vec![cert], private_key).unwrap();
+    let server_config = Arc::new(config);
+
+    let mut config = ClientConfig::new();
+    config
+        .dangerous()
+        .set_certificate_verifier(Arc::new(IngoreCertVerifier));
+    let client_config = Arc::new(config);
+
+    let acceptor = TlsAcceptor::from(server_config);
+    let connector = TlsConnector::from(client_config);
+
+    const TEST_CHANNEL_ID: DataChannelId = 0;
+    const TEST_PORT: u16 = 1615;
+
+    let mut client_switch = ChannelSwitch::default();
+    let client_io = client_switch
+        .create_channel(TEST_CHANNEL_ID)
+        .await
+        .expect("failed to create channel");
+
+    let mut server_switch = ChannelSwitch::default();
+    let server_io = server_switch
+        .create_channel(TEST_CHANNEL_ID)
+        .await
+        .expect("failed to create channel");
+
+    tokio::spawn(server_switch.listen(format!("0.0.0.0:{}", TEST_PORT)));
+    tokio::spawn(client_switch.connect(format!("127.0.0.1:{}", TEST_PORT)));
+
+    let client_task = tokio::spawn(async move {
+        let domain = webpki::DNSNameRef::try_from_ascii_str("localhost").unwrap();
+        let tls_stream = connector
+            .connect(domain, client_io)
+            .await
+            .expect("failed to perform client handshake");
+
+        Result::<(), &'static str>::Ok(())
+    });
+
+    let server_task = tokio::spawn(async move {
+        let tls_stream = acceptor
+            .accept(server_io)
+            .await
+            .expect("failed to perform server handshake");
+
+        Result::<(), &'static str>::Ok(())
+    });
+
+    let (client_result, server_result) = tokio::join!(client_task, server_task);
+
+    match (client_result, server_result) {
+        (Ok(Ok(_)), Ok(Ok(_))) => {}
         _ => {
             panic!("transfer failed!")
         }

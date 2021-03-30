@@ -55,10 +55,7 @@ impl AsyncRead for ChannelIO {
                 ChannelRxState::WaitingForMessage => {
                     let message = ready!(Pin::new(&mut self.rx).poll_next(cx));
                     if message.is_none() {
-                        return Poll::Ready(Err(std::io::Error::new(
-                            std::io::ErrorKind::UnexpectedEof,
-                            "Stream was closed".to_string(),
-                        )));
+                        return Poll::Ready(Ok(()));
                     }
 
                     self.rx_state = ChannelRxState::ReadingMessage(message.unwrap());
@@ -88,6 +85,18 @@ impl AsyncWrite for ChannelIO {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
+        let channel = self.channel_num;
+        let result = self.tx.try_send(ConductorMessage {
+            channel,
+            data: Bytes::copy_from_slice(buf),
+        });
+
+        if let Err(_) = result {
+            println!("fail!");
+        }
+
+        Poll::Ready(Ok(buf.len()))
+        /*
         loop {
             match self.tx_state.take().unwrap() {
                 ChannelTxState::WaitingForMessage => {
@@ -137,6 +146,7 @@ impl AsyncWrite for ChannelIO {
                 }
             }
         }
+         */
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
