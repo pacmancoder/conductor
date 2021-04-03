@@ -13,15 +13,14 @@
 //! | **purpose**  | marker     |  channel_id           | payload_size           |
 //! | **type**     | u8         |  u16, LE              | u16, LE                |
 
-mod control;
-
-
 use byteorder::ReadBytesExt;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-
 use thiserror::Error;
 use tokio_util::codec::{Decoder, Encoder};
 use uuid::Uuid;
+
+mod control;
+pub mod tunnel;
 
 const HEADER_SIZE: usize = 5;
 const HEADER_MARKER_VALUE: u8 = 0x56;

@@ -1,10 +1,8 @@
+use crate::{db::Database, rest::SyncDatabase};
+use std::{path::Path, sync::Arc};
+use tokio::sync::Mutex;
 
 const DEFAULT_REST_API_PORT: u16 = 1613;
-
-#[rocket::get("/health")]
-async fn get_health() -> &'static str {
-    "I am alive and good!"
-}
 
 pub struct RestServer {
     port: u16,
@@ -28,13 +26,28 @@ impl RestServer {
     }
 
     pub async fn run(self) {
+        use crate::rest::{auth, health, tunnel};
+
         let mut config = rocket::Config::default();
         config.port = self.port;
         config.ctrlc = false;
 
+        let database = Database::open(Path::new("conductor.db"))
+            .await
+            .expect("Failed to open database");
+
+        let routes = Vec::new()
+            .into_iter()
+            .chain(auth::routes())
+            .chain(health::routes())
+            .chain(tunnel::routes())
+            .collect::<Vec<_>>();
+
         rocket::custom(config)
-            .mount("/api/v1", rocket::routes![get_health])
-            .launch().await
+            .manage(Arc::new(Mutex::new(database)))
+            .mount("/api/v1", routes)
+            .launch()
+            .await
             .expect("REST API server failed");
     }
 }
