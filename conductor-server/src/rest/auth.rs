@@ -2,7 +2,7 @@ use crate::{
     db,
     rest::{ApiError, ApiResponse, ApiResult, SyncDatabase},
 };
-use rocket::futures::future::err;
+
 use rocket::{
     request::{FromRequest, Outcome, Request},
     Route, State,

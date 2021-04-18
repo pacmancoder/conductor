@@ -254,7 +254,7 @@ async fn channel_switch_can_handle_rustls() {
 
     let client_task = tokio::spawn(async move {
         let domain = webpki::DNSNameRef::try_from_ascii_str("localhost").unwrap();
-        let tls_stream = connector
+        let _tls_stream = connector
             .connect(domain, client_io)
             .await
             .expect("failed to perform client handshake");
@@ -263,7 +263,7 @@ async fn channel_switch_can_handle_rustls() {
     });
 
     let server_task = tokio::spawn(async move {
-        let tls_stream = acceptor
+        let _tls_stream = acceptor
             .accept(server_io)
             .await
             .expect("failed to perform server handshake");

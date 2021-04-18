@@ -1,4 +1,4 @@
-use crate::{db::Database, rest::SyncDatabase};
+use crate::{db::Database};
 use std::{path::Path, sync::Arc};
 use tokio::sync::Mutex;
 

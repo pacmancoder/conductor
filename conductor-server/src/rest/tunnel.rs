@@ -2,7 +2,7 @@ use crate::rest::{auth::AuthTokenClaims, ApiResponse, ApiResult};
 use rocket::Route;
 
 #[rocket::get("/tunnel/list")]
-fn query_user_tunnels(token: AuthTokenClaims) -> ApiResult {
+fn query_user_tunnels(_token: AuthTokenClaims) -> ApiResult {
     ApiResponse::json("TEST")
 }
 

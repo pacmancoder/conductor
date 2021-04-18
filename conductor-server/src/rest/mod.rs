@@ -6,9 +6,9 @@ pub mod server;
 
 use crate::db::Database;
 use serde::Serialize;
-use std::borrow::Cow;
+
 use std::sync::Arc;
-use thiserror::Error;
+
 use tokio::sync::Mutex;
 
 use rocket::http::ContentType;

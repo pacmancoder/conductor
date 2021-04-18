@@ -82,7 +82,7 @@ const MAX_MESSAGE_SIZE: usize = 1024;
 impl AsyncWrite for ChannelIO {
     fn poll_write(
         mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
+        _cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         let channel = self.channel_num;

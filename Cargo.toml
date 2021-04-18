@@ -1,2 +1,6 @@
 [workspace]
-members = [ "conductor-lib", "conductor-server", "conductor" ]
+members = [
+    "conductor-lib",
+    "conductor-server",
+    "conductor"
+]
