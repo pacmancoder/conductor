@@ -1,10 +1,10 @@
-use crate::{Result, Error};
-use tokio::{
-    net::TcpStream,
-    io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt},
-};
+use crate::{Error, Result};
 use futures::FutureExt;
 use std::num::NonZeroUsize;
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+};
 
 async fn forward_reader_to_writer<R, W>(mut reader: R, mut writer: W) -> Result<()>
 where
@@ -16,7 +16,10 @@ where
     let bytes_read = reader.read(&mut buf).await.map_err(Error::from_io_error)?;
 
     while let Some(count) = NonZeroUsize::new(bytes_read) {
-        writer.write_all(&buf[0..count.get()]).await.map_err(Error::from_io_error)?;
+        writer
+            .write_all(&buf[0..count.get()])
+            .await
+            .map_err(Error::from_io_error)?;
     }
 
     Ok(())

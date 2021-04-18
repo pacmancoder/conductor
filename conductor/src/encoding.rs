@@ -12,6 +12,12 @@ where
     }
 }
 
+impl AsRef<[u8]> for Base64EncodedData {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Serialize for Base64EncodedData {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

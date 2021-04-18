@@ -1,5 +1,7 @@
 pub mod command;
+pub mod db;
 pub mod encoding;
+pub mod env;
 pub mod net;
 
 mod connection;

@@ -1,5 +1,5 @@
+
 use thiserror::Error;
-use futures::future::err;
 
 pub type StringCow = std::borrow::Cow<'static, str>;
 
@@ -11,9 +11,15 @@ pub enum ConductorError {
         cause: StringCow,
     },
     #[error("Failed to perform IO operation: {source}")]
-    IoError {
-        source: std::io::Error,
-    }
+    IoError { source: std::io::Error },
+    #[error("Personal key store was not found")]
+    KeyStoreIsMissing,
+    #[error("Personal key store is corrupted")]
+    KeyStoreIsCorrupted,
+    #[error("Failed to generate keystore")]
+    KeyStoreGenerationFailure,
+    #[error("Application error")]
+    ApplicationError { cause: StringCow },
 }
 
 impl ConductorError {
@@ -29,5 +35,11 @@ impl ConductorError {
 
     pub fn from_io_error(source: std::io::Error) -> Self {
         Self::IoError { source }
+    }
+
+    pub fn from_application_error(cause: impl Into<StringCow>) -> Self {
+        Self::ApplicationError {
+            cause: cause.into(),
+        }
     }
 }
