@@ -1,4 +1,5 @@
 use thiserror::Error;
+use futures::future::err;
 
 pub type StringCow = std::borrow::Cow<'static, str>;
 
@@ -9,6 +10,10 @@ pub enum ConductorError {
         source_string: String,
         cause: StringCow,
     },
+    #[error("Failed to perform IO operation: {source}")]
+    IoError {
+        source: std::io::Error,
+    }
 }
 
 impl ConductorError {
@@ -20,5 +25,9 @@ impl ConductorError {
             source_string: source_string.into(),
             cause: cause.into(),
         }
+    }
+
+    pub fn from_io_error(source: std::io::Error) -> Self {
+        Self::IoError { source }
     }
 }

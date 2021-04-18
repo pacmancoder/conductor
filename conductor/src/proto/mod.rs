@@ -4,7 +4,7 @@
 //! 1. Server sends its public key in response (signed but signature is not chekced)
 //!     - On this step client may reject server
 //! 1. Client sends encrypted request for tunnel (encrypted via server RSA)
-//!     - Tunnel info (id, role)
+//!     - Tunnel info (id, role, channel_id)
 //!     - Client public key (for challenge)
 //!     - On this step server may reject cient
 //! 1. Server sends challenge for client to ensure client owns the key (signed, validated)
@@ -48,6 +48,7 @@ pub enum ServerFailure {
     ClientKeyRejected,
     ClientChallengeFailed,
     AccessDenied,
+    Conflict,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,8 +60,9 @@ pub enum PeerFailure {
 
 #[derive(Serialize, Deserialize)]
 pub enum TunnelRole {
-    Host,
-    Client,
+    Listen,
+    Accept,
+    Connect,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -70,6 +72,7 @@ pub enum PeerMessage {
     },
     CreateSession {
         id: Uuid,
+        channel_id: Uuid,
         role: TunnelRole,
         client_key: Base64EncodedData,
     },
