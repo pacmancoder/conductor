@@ -1,2 +1,5 @@
 [workspace]
-members = ["conductor"]
+members = [
+    "conductor",
+    "conductor-cli",
+]

@@ -1,3 +1,8 @@
+mod args;
+
+use args::{AcceptedCommand, Args};
+
+/*
 use anyhow::Context;
 use clap::Clap;
 use futures::FutureExt;
@@ -86,16 +91,6 @@ impl FromStr for Protocol {
             protocol @ _ => Err(anyhow::anyhow!("Invalid protocol '{}'", protocol)),
         }
     }
-}
-
-#[derive(Serialize, Deserialize)]
-struct Config {
-    port: PortNum,
-    client_port: Option<PortNum>,
-    protocol: Protocol,
-    server: String,
-    key: String,
-    id: uuid::Uuid,
 }
 
 #[derive(Clap)]
@@ -699,4 +694,14 @@ async fn process_server_stream(config: Arc<Config>, key: Arc<PrivateKey>, channe
     forward_socket(local_stream, stream).await?;
 
     Ok(())
+}
+*/
+
+fn main() {
+    match Args::accept() {
+        AcceptedCommand::Create(_) => {}
+        AcceptedCommand::Serve(_) => {}
+        AcceptedCommand::Connect(_) => {}
+        AcceptedCommand::Listen(_) => {}
+    }
 }
