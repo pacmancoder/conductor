@@ -29,6 +29,8 @@ pub enum ConductorError {
     PeerChallengeResolveFailed,
     #[error("Server returned invalid key")]
     InvalidServerKey,
+    #[error("Invalid auth sequence")]
+    AuthSequenceFailed,
 }
 
 impl ConductorError {

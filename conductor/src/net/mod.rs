@@ -30,7 +30,7 @@ impl FromStr for Protocol {
         match s.to_lowercase().as_str() {
             "tcp" => Ok(Self::Tcp),
             "udp" => Ok(Self::Udp),
-            protocol  => Err(ConductorError::from_string_parsing_error(
+            protocol => Err(ConductorError::from_string_parsing_error(
                 protocol,
                 "Invalid protocol",
             )),
