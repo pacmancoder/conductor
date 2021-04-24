@@ -31,6 +31,14 @@ pub enum ConductorError {
     InvalidServerKey,
     #[error("Invalid auth sequence")]
     AuthSequenceFailed,
+    #[error("Tunnel alias does not exist")]
+    TunnelAliasDoesNotExist,
+    #[error("Tunnel does not exist")]
+    TunnelDoesNotExist,
+    #[error("Tunnel already exist")]
+    TunnelAlreadyExist,
+    #[error("Catalog db was corrupted")]
+    CorruptedCatalog,
 }
 
 impl ConductorError {

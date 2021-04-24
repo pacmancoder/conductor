@@ -2,6 +2,8 @@ use crate::{Error, Result};
 use rsa::PublicKeyParts;
 use sha2::{Digest, Sha256};
 
+pub type Fingerprint = String;
+
 pub struct PublicKey {
     key: rsa::RSAPublicKey,
     key_picky: picky::key::PublicKey,
@@ -24,7 +26,7 @@ impl PublicKey {
         })
     }
 
-    pub fn fingerprint(&self) -> String {
+    pub fn fingerprint(&self) -> Fingerprint {
         let modulus = self.key.n().to_bytes_be();
         let exponent = self.key.e().to_bytes_be();
 
