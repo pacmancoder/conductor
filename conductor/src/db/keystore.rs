@@ -33,7 +33,8 @@ impl KeyStore {
             .await
             .map_err(Error::from_io_error)?;
 
-        let keystore = toml::from_slice(&keystore_data).map_err(|_| Error::KeyStoreIsCorrupted)?;
+        let keystore =
+            serde_json::from_slice(&keystore_data).map_err(|_| Error::KeyStoreIsCorrupted)?;
 
         Ok(keystore)
     }
@@ -68,7 +69,7 @@ impl KeyStore {
             .await
             .map_err(Error::from_io_error)?;
 
-        let keystore_data = toml::to_vec(self)
+        let keystore_data = serde_json::to_vec_pretty(self)
             .map_err(|_| Error::from_application_error("Keysore serialization failed"))?;
 
         keystore_file

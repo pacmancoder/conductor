@@ -1,11 +1,14 @@
-
-use std::collections::{HashMap, HashSet};
-use serde::{Serialize, Deserialize};
 use crate::{
-    Result,
-    Error,
+    crypto::keys::{Fingerprint, FingerprintRef},
+    env::{locate_path, PathAsset},
     proto::TunnelRole,
-    crypto::keys::Fingerprint,
+    Error, Result,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
 };
 
 type TunnelId = uuid::Uuid;
@@ -28,7 +31,7 @@ enum PeerRules {
 }
 
 impl PeerRules {
-    fn peer_allowed(&self, peer_fingerprint: &Fingerprint) -> bool {
+    fn peer_allowed(&self, peer_fingerprint: FingerprintRef) -> bool {
         match self {
             PeerRules::Open => true,
             PeerRules::AcceptList(peers) => peers.contains(peer_fingerprint),
@@ -38,30 +41,29 @@ impl PeerRules {
 
     fn make_open(&mut self) {
         match self {
-            PeerRules::BlockList(_) | PeerRules::Open => { return; }
-            PeerRules::AcceptList(_) => { *self = PeerRules::Open }
+            PeerRules::BlockList(_) | PeerRules::Open => {}
+            PeerRules::AcceptList(_) => *self = PeerRules::Open,
         }
     }
 
     fn make_protected(&mut self) {
         match self {
-            PeerRules::AcceptList(_) => { return; }
-            PeerRules::BlockList(_) | PeerRules::Open => { *self = PeerRules::AcceptList(HashSet::new()); }
+            PeerRules::AcceptList(_) => {}
+            PeerRules::BlockList(_) | PeerRules::Open => {
+                *self = PeerRules::AcceptList(HashSet::new());
+            }
         }
     }
 
     fn is_protected(&self) -> bool {
-        match self {
-            PeerRules::AcceptList(_) => true,
-            _ => false,
-        }
+        matches!(self, PeerRules::AcceptList(_))
     }
 
-    fn allow_peer(&mut self, peer_fingerprint: &Fingerprint) {
+    fn allow_peer(&mut self, peer_fingerprint: FingerprintRef) {
         match self {
-            PeerRules::Open => {},
+            PeerRules::Open => {}
             PeerRules::AcceptList(peers) => {
-                peers.insert(peer_fingerprint.clone());
+                peers.insert(peer_fingerprint.to_owned());
             }
             PeerRules::BlockList(peers) => {
                 peers.remove(peer_fingerprint);
@@ -69,22 +71,21 @@ impl PeerRules {
         }
     }
 
-    fn block_peer(&mut self, peer_fingerprint: &Fingerprint) {
+    fn block_peer(&mut self, peer_fingerprint: FingerprintRef) {
         match self {
             PeerRules::Open => {
                 let mut peers = HashSet::new();
-                peers.insert(peer_fingerprint.clone());
+                peers.insert(peer_fingerprint.to_owned());
                 *self = PeerRules::BlockList(peers);
-            },
+            }
             PeerRules::AcceptList(peers) => {
                 peers.remove(peer_fingerprint);
             }
             PeerRules::BlockList(peers) => {
-                peers.insert(peer_fingerprint.clone());
+                peers.insert(peer_fingerprint.to_owned());
             }
         }
     }
-
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -139,31 +140,101 @@ pub struct Catalog {
 }
 
 impl Catalog {
-    pub fn is_tunnel_access_granted_for_peer(&self, tunnel: &TunnelSelector, role: TunnelRole, fingerprint: &Fingerprint) -> Result<bool> {
-        Ok(self.get_tunnel_info(tunnel)?.rules_for_role(&role).peer_allowed(fingerprint))
+    pub async fn load() -> Result<Self> {
+        let catalog_path = locate_path(PathAsset::PeerCatalog);
+
+        if !catalog_path.exists() {
+            return Err(Error::PeerCatalogIsMissing);
+        }
+
+        let mut catalog_file = File::open(catalog_path)
+            .await
+            .map_err(Error::from_io_error)?;
+
+        let mut catalog_data = Vec::new();
+        catalog_file
+            .read_to_end(&mut catalog_data)
+            .await
+            .map_err(Error::from_io_error)?;
+
+        let catalog =
+            serde_json::from_slice(&catalog_data).map_err(|_| Error::PeerCatalogIsCorrupted)?;
+
+        Ok(catalog)
     }
 
-    pub fn grant_tunnel_access_for_peer(&mut self, tunnel: &TunnelSelector, role: TunnelRole, fingerprint: &Fingerprint) -> Result<()> {
-        self.get_tunnel_mut(tunnel)?.rules_for_role_mut(&role).allow_peer(fingerprint);
+    pub async fn save(&self) -> Result<()> {
+        let catalog_path = locate_path(PathAsset::PeerCatalog);
+
+        let mut catalog_file = File::create(catalog_path)
+            .await
+            .map_err(Error::from_io_error)?;
+
+        let catalog_data = serde_json::to_vec_pretty(self)
+            .map_err(|_| Error::from_application_error("Catalog serialization failed"))?;
+
+        catalog_file
+            .write_all(&catalog_data)
+            .await
+            .map_err(Error::from_io_error)?;
+
         Ok(())
     }
 
-    pub fn block_tunnel_access_for_peer(&mut self, tunnel: &TunnelSelector, role: TunnelRole, fingerprint: &Fingerprint) -> Result<()> {
-        self.get_tunnel_mut(tunnel)?.rules_for_role_mut(&role).block_peer(fingerprint);
+    pub fn is_tunnel_access_granted_for_peer(
+        &self,
+        tunnel: &TunnelSelector,
+        role: TunnelRole,
+        fingerprint: FingerprintRef,
+    ) -> Result<bool> {
+        Ok(self
+            .get_tunnel_info(tunnel)?
+            .rules_for_role(&role)
+            .peer_allowed(fingerprint))
+    }
+
+    pub fn grant_tunnel_access_for_peer(
+        &mut self,
+        tunnel: &TunnelSelector,
+        role: TunnelRole,
+        fingerprint: FingerprintRef,
+    ) -> Result<()> {
+        self.get_tunnel_mut(tunnel)?
+            .rules_for_role_mut(&role)
+            .allow_peer(fingerprint);
+        Ok(())
+    }
+
+    pub fn block_tunnel_access_for_peer(
+        &mut self,
+        tunnel: &TunnelSelector,
+        role: TunnelRole,
+        fingerprint: FingerprintRef,
+    ) -> Result<()> {
+        self.get_tunnel_mut(tunnel)?
+            .rules_for_role_mut(&role)
+            .block_peer(fingerprint);
         Ok(())
     }
 
     pub fn is_tunnel_protected(&self, tunnel: &TunnelSelector) -> Result<bool> {
-        Ok(self.get_tunnel_info(tunnel)?.rules_for_role(&TunnelRole::Connect).is_protected())
+        Ok(self
+            .get_tunnel_info(tunnel)?
+            .rules_for_role(&TunnelRole::Connect)
+            .is_protected())
     }
 
     pub fn make_tunnel_open(&mut self, tunnel: &TunnelSelector) -> Result<()> {
-        self.get_tunnel_mut(tunnel)?.rules_for_role_mut(&TunnelRole::Connect).make_open();
+        self.get_tunnel_mut(tunnel)?
+            .rules_for_role_mut(&TunnelRole::Connect)
+            .make_open();
         Ok(())
     }
 
     pub fn make_tunnel_protected(&mut self, tunnel: &TunnelSelector) -> Result<()> {
-        self.get_tunnel_mut(tunnel)?.rules_for_role_mut(&TunnelRole::Connect).make_protected();
+        self.get_tunnel_mut(tunnel)?
+            .rules_for_role_mut(&TunnelRole::Connect)
+            .make_protected();
         Ok(())
     }
 
@@ -175,14 +246,17 @@ impl Catalog {
         }
 
         self.tunnel_aliases.insert(name.to_owned(), id);
-        self.tunnels.insert(id, TunnelInfo {
-            name: name.to_owned(),
-            rules: TunnelRules {
-                // By default, any peer will be rejected
-                accept: PeerRules::AcceptList(HashSet::new()),
-                connect: PeerRules::AcceptList(HashSet::new()),
-            }
-        });
+        self.tunnels.insert(
+            id,
+            TunnelInfo {
+                name: name.to_owned(),
+                rules: TunnelRules {
+                    // By default, any peer will be rejected
+                    accept: PeerRules::AcceptList(HashSet::new()),
+                    connect: PeerRules::AcceptList(HashSet::new()),
+                },
+            },
+        );
 
         Ok(id)
     }
@@ -190,12 +264,20 @@ impl Catalog {
     pub fn remove_tunnel(&mut self, tunnel: &TunnelSelector) -> Result<()> {
         let (id, name) = match tunnel {
             TunnelSelector::ById(id) => {
-                let name = self.tunnels.get(id).ok_or(Error::TunnelDoesNotExist)?.name.clone();
-                (id.clone(), name)
-            },
+                let name = self
+                    .tunnels
+                    .get(id)
+                    .ok_or(Error::TunnelDoesNotExist)?
+                    .name
+                    .clone();
+                (*id, name)
+            }
             TunnelSelector::ByAlias(alias) => {
-                let id = self.tunnel_aliases.get(alias).ok_or(Error::TunnelAliasDoesNotExist)?.clone();
-                (id, alias.clone())
+                let id = self
+                    .tunnel_aliases
+                    .get(alias)
+                    .ok_or(Error::TunnelAliasDoesNotExist)?;
+                (*id, alias.clone())
             }
         };
 
@@ -207,30 +289,32 @@ impl Catalog {
     fn get_tunnel_info(&self, tunnel: &TunnelSelector) -> Result<&TunnelInfo> {
         let id = match tunnel {
             TunnelSelector::ById(id) => id,
-            TunnelSelector::ByAlias(alias) => {
-                self.tunnel_aliases.get(alias).ok_or(Error::TunnelAliasDoesNotExist)?
-            }
+            TunnelSelector::ByAlias(alias) => self
+                .tunnel_aliases
+                .get(alias)
+                .ok_or(Error::TunnelAliasDoesNotExist)?,
         };
         self.tunnels.get(id).ok_or(Error::CorruptedCatalog)
     }
 
     fn get_tunnel_mut(&mut self, tunnel: &TunnelSelector) -> Result<&mut TunnelInfo> {
-        let Self { tunnels, tunnel_aliases} = self;
+        let Self {
+            tunnels,
+            tunnel_aliases,
+        } = self;
 
         let id = match tunnel {
             TunnelSelector::ById(id) => id,
-            TunnelSelector::ByAlias(alias) => {
-                tunnel_aliases.get(alias).ok_or(Error::TunnelAliasDoesNotExist)?
-            }
+            TunnelSelector::ByAlias(alias) => tunnel_aliases
+                .get(alias)
+                .ok_or(Error::TunnelAliasDoesNotExist)?,
         };
         tunnels.get_mut(id).ok_or(Error::CorruptedCatalog)
     }
 }
 
-
 #[cfg(test)]
-mod tests
-{
+mod tests {
     use super::*;
     use expect_test::expect;
 
@@ -243,10 +327,24 @@ mod tests
 
         catalog.make_tunnel_open(&"foo".to_string().into()).unwrap();
         catalog.make_tunnel_protected(&tunnel2_id.into()).unwrap();
-        catalog.make_tunnel_open(&"foobar".to_string().into()).unwrap();
+        catalog
+            .make_tunnel_open(&"foobar".to_string().into())
+            .unwrap();
 
-        catalog.block_tunnel_access_for_peer(&"foo".to_string().into(), TunnelRole::Connect, &"f_o_o".to_owned()).unwrap();
-        catalog.grant_tunnel_access_for_peer(&"bar".to_string().into(), TunnelRole::Accept, &"b_a_r".to_owned()).unwrap();
+        catalog
+            .block_tunnel_access_for_peer(
+                &"foo".to_string().into(),
+                TunnelRole::Connect,
+                &"f_o_o".to_owned(),
+            )
+            .unwrap();
+        catalog
+            .grant_tunnel_access_for_peer(
+                &"bar".to_string().into(),
+                TunnelRole::Accept,
+                &"b_a_r".to_owned(),
+            )
+            .unwrap();
 
         expect![[r#"
             {
@@ -293,6 +391,6 @@ mod tests
                 "bar": "70f7046e-260a-4e0d-9539-85fe5f6f86c4"
               }
             }"#]]
-            .assert_eq(&serde_json::to_string_pretty(&catalog).unwrap())
+        .assert_eq(&serde_json::to_string_pretty(&catalog).unwrap())
     }
 }

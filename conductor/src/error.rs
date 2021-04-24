@@ -13,8 +13,12 @@ pub enum ConductorError {
     IoError { source: std::io::Error },
     #[error("Personal key store was not found")]
     KeyStoreIsMissing,
+    #[error("Peer catalog is missing")]
+    PeerCatalogIsMissing,
     #[error("Personal key store is corrupted")]
     KeyStoreIsCorrupted,
+    #[error("Peer catalog is corrupted")]
+    PeerCatalogIsCorrupted,
     #[error("Crypto key is corrupted")]
     CorruptedCryptoKey,
     #[error("Failed to generate keystore")]

@@ -3,6 +3,7 @@ use rsa::PublicKeyParts;
 use sha2::{Digest, Sha256};
 
 pub type Fingerprint = String;
+pub type FingerprintRef<'a> = &'a str;
 
 pub struct PublicKey {
     key: rsa::RSAPublicKey,

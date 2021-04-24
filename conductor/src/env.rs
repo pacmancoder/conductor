@@ -43,8 +43,8 @@ pub fn locate_path(asset: PathAsset) -> PathBuf {
     std::fs::create_dir_all(&base_dir).expect("Failed to create app data folder");
 
     match asset {
-        PathAsset::PeerCatalog => base_dir.join("peer_catalog.toml"),
-        PathAsset::KeyStore => base_dir.join("keystore.toml"),
+        PathAsset::PeerCatalog => base_dir.join("peer_catalog.json"),
+        PathAsset::KeyStore => base_dir.join("keystore.json"),
     }
 }
 
