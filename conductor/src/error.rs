@@ -1,4 +1,3 @@
-
 use thiserror::Error;
 
 pub type StringCow = std::borrow::Cow<'static, str>;
@@ -16,10 +15,20 @@ pub enum ConductorError {
     KeyStoreIsMissing,
     #[error("Personal key store is corrupted")]
     KeyStoreIsCorrupted,
+    #[error("Crypto key is corrupted")]
+    CorruptedCryptoKey,
     #[error("Failed to generate keystore")]
     KeyStoreGenerationFailure,
     #[error("Application error")]
     ApplicationError { cause: StringCow },
+    #[error("Tunnel establish message is too big")]
+    TooBigMessage,
+    #[error("Tunnel establish message is corrupted")]
+    MessageIsCorrupted,
+    #[error("Failed to perform peer challenge")]
+    PeerChallengeResolveFailed,
+    #[error("Server returned invalid key")]
+    InvalidServerKey,
 }
 
 impl ConductorError {

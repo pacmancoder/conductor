@@ -1,17 +1,17 @@
 //! # General protocol description
-//! 1. Client sends Initiation request (signed but signature is not checked)
-//!     - Request holds protocol version for initiation
-//! 1. Server sends its public key in response (signed but signature is not chekced)
-//!     - On this step client may reject server
+//! 1. Client sends Initiation request (unencrypted)
+//!     - Request contains protocol version for initiation
+//! 1. Server sends its public key in response (unencrypted)
+//!     - Client checks server key against footprint in config (requects if not equal)
 //! 1. Client sends encrypted request for tunnel (encrypted via server RSA)
 //!     - Tunnel info (id, role, channel_id)
 //!     - Client public key (for challenge)
-//!     - On this step server may reject cient
-//! 1. Server sends challenge for client to ensure client owns the key (signed, validated)
-//!     - 64 bytes of random data encrypted via RSA
-//! 1. Client sends unencrypted challenge (encrypted via server RSA)
+//!     - On this step server may reject cient based on client key footprint
+//! 1. Server sends challenge for client to ensure client owns the key (encrypted via client key)
+//!     - 64 bytes of random data
+//! 1. Client sends decrypted challenge (encrypted via server RSA)
 //!     - 64 bytes decrypted via client key
-//! 1. Server sends Success message or error if challenge was failed (signed, validated)
+//! 1. Server sends Success message or error if challenge was failed (encrypted via client key)
 mod protocol_revision;
 
 pub use protocol_revision::ProtocolRevision;
@@ -66,19 +66,18 @@ pub enum TunnelRole {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct CreateSessionRequest {
+    pub id: Uuid,
+    pub channel_id: Uuid,
+    pub role: TunnelRole,
+    pub client_key: Base64EncodedData,
+}
+
+#[derive(Serialize, Deserialize)]
 pub enum PeerMessage {
-    InitiateSession {
-        version: ProtocolRevision,
-    },
-    CreateSession {
-        id: Uuid,
-        channel_id: Uuid,
-        role: TunnelRole,
-        client_key: Base64EncodedData,
-    },
-    ClientChallengeDone {
-        data: Base64EncodedData,
-    },
+    InitiateSession { protocol_revision: ProtocolRevision },
+    CreateSession(CreateSessionRequest),
+    ClientChallengeDone { data: Base64EncodedData },
     Failure(PeerFailure),
 }
 

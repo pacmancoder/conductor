@@ -13,7 +13,7 @@ impl FromStr for PortNum {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.parse::<u16>()
             .map_err(|_| ConductorError::from_string_parsing_error(s, "Invalid port number"))
-            .map(|p| Self(p))
+            .map(Self)
     }
 }
 
@@ -30,7 +30,7 @@ impl FromStr for Protocol {
         match s.to_lowercase().as_str() {
             "tcp" => Ok(Self::Tcp),
             "udp" => Ok(Self::Udp),
-            protocol @ _ => Err(ConductorError::from_string_parsing_error(
+            protocol  => Err(ConductorError::from_string_parsing_error(
                 protocol,
                 "Invalid protocol",
             )),

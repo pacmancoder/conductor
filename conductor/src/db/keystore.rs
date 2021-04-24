@@ -3,7 +3,6 @@ use crate::{
     env::{locate_path, PathAsset},
     Error, Result,
 };
-use rsa;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::File,
@@ -11,7 +10,7 @@ use tokio::{
 };
 
 #[derive(Serialize, Deserialize)]
-struct KeyStore {
+pub struct KeyStore {
     public: Base64EncodedData,
     private: Base64EncodedData,
 }
@@ -78,5 +77,13 @@ impl KeyStore {
             .map_err(Error::from_io_error)?;
 
         Ok(())
+    }
+
+    pub fn public_key(&self) -> &[u8] {
+        self.public.as_ref()
+    }
+
+    pub fn private_key(&self) -> &[u8] {
+        self.private.as_ref()
     }
 }

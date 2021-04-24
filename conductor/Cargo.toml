@@ -5,16 +5,18 @@ authors = ["Vladyslav Nikonov <mail@pacmancoder.xyz>"]
 edition = "2018"
 
 [dependencies]
-log = "0.4.14"
-toml = "0.5.8"
-serde = "1.0.125"
-base64 = "0.13.0"
-picky = { version = "6.2.0", features = ["jose"] }
-byteorder = "1.4.3"
-uuid = { version = "0.8.2", features = ["v4", "serde"] }
+log = "0.4"
+toml = "0.5"
+serde = "1.0"
+base64 = "0.13"
+picky = { version = "6.2", features = ["jose"] }
+byteorder = "1.4"
+uuid = { version = "0.8", features = ["v4", "serde"] }
 tokio = { version = "1", features = ["full"] }
-futures = "0.3.14"
+futures = "0.3"
 thiserror = "1"
 directories = "3"
 rsa = "0.4"
 rand = "0.8"
+serde_json = "1"
+sha2 = "0.9"

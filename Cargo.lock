@@ -230,6 +230,8 @@ dependencies = [
  "rand 0.8.3",
  "rsa 0.4.0",
  "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
  "toml",

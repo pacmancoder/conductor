@@ -8,7 +8,7 @@ impl From<u32> for ProtocolRevision {
     fn from(rev: u32) -> Self {
         match rev {
             0 => Self::R0,
-            rev @ _ => Self::Unknown(rev),
+            rev => Self::Unknown(rev),
         }
     }
 }

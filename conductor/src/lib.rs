@@ -1,10 +1,14 @@
+#![allow(dead_code)]
+
 pub mod command;
 pub mod db;
 pub mod encoding;
 pub mod env;
 pub mod net;
 
+mod auth;
 mod connection;
+mod crypto;
 mod proto;
 mod worker;
 
